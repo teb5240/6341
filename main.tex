@@ -1,0 +1,131 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{IEEEtrantools}
+% \usepackage[fleqn]{mathtools}
+% \usepackage{amssymb}
+% \usepackage{amsthm}
+% \usepackage{enumitem}
+
+\usepackage{xcolor}
+
+\definecolor{light-gray}{gray}{0.95}
+\newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
+
+\title{Discrete-Time Signal Processing RTL-SDR Project 1}
+\author{Taylor Baum}
+\date{October 2019}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+\subsection{Background}
+
+We consider a RTL-SDR system - an approximately \$25 radio scanner. The device consists of mixer, a low pass filter, and an Analog to Digital Converter (ADC). The mixer mixes the signal with a complex exponential $e^{-j\Omega_c}$. This is frequency-shifting the input signal to be centered at $\Omega_c = 2\pi f_s$ which is often referred to as frequency modulation. The ADC has a sampling frequency of $f_s = 2\pi\Omega_s$.
+
+\section{Methods}
+
+\subsection{Raw Data}
+
+\subsubsection{Data Collection}
+
+For data collection, I captured $10$ seconds of data with a center frequency in the band where FM radio is present, $88$ MHz $ < f_c < 108$ MHz with a sampling frequency of $f_s = 2.048$ MHz.
+
+\noindent Parameters set:
+\begin{enumerate}
+    \item Center Frequency ($\Omega_c$):  % 104.9 MHz with another peak at 103.9 MHz
+    \item Sampling Frequency ($f_s$): 2048000 Input Rate which translates to $f_s = 2.048$ MHz %this is $8*256000$ or $8*256$ KHz
+    % \item Mode: I used WFM (mono) when listening to the output of the data.
+\end{enumerate}
+
+\noindent I recorded 4 different sound signals. The rock tracks were taken from 104.9 MHz and the melodic piece was from 103.9 MHz.
+
+\subsubsection{Given Data}
+
+% data_given_1 = gqrx_20191029_215237_100600000_2048000_fc.raw
+
+We were provided two raw data files. The first, data\_given\_1 was sampled at $2.048$ MHz with a center frequency of $100.6$ MHz and a hardware offset of $100$ kHz; the sound content was centered at $100.7$ MHz.
+
+% data_given_2 = gqrx_20191030_160234_99200000_2048000_fc.raw
+
+This one has a hardware center frequency of 99.2 MHz, recorded at 2.048 MHz. There is sound content centered at 99.5 MHz and 98.5 MHz.
+
+\subsubsection{Understanding Raw Data}
+
+Our raw data is complex, as it is I/Q Demodulated. Real-valued Bandpass signals may be represented as the real part of a complex-valued analytic signal. The GQRX platform does this for us.  A real Bandpass signal, $x_p(t)$, can be represented as follows:
+\begin{IEEEeqnarray}{rCl}
+    x_p(t) & = & a(t)cos(\Omega_c + \phi(t)) \\
+    & = & x_I(t)cos(\Omega_ct)-x_Q(t)sin(\Omega_ct) \\
+    & = & Re\{x(t)e^{j\Omega_ct}\}
+\end{IEEEeqnarray}
+
+\noindent A complex Bandpass signal, $x(t)$, as related to a real Bandpass signal, $x_p(t)$, is as follows:
+\begin{IEEEeqnarray}{rCl}
+    x(t) & = & x_I(t) + jx_Q(t) \\
+    & = & a(t)e^{j\phi(t)}
+\end{IEEEeqnarray}
+If there is no offset from the hardware center frequency, our raw data is a complex Bandpass Signal, $x(t)$. If we set an offset on the GQRX platform, our complex Bandpass signal is $x(t)$ centered at that offset frequency.
+
+\subsection{Discrete-Time Channel Selection}
+
+\subsubsection{Visualization}
+
+% https://docs.scipy.org/doc/numpy/reference/generated/numpy.fft.fft.html
+
+To confirm that my steps are affecting the signal in a way I expect, I computed the fast Fourier transform (FFT) of my input signal. The FFT algorithm I used, numpy.fft.fft comes from the numpy Discrete Fourier Transform package (numpy.fft). It computes the $N$-length discrete Fourier Transform DFT where $N$ is the length of input signal. This function outputs $0:N-1$ samples of the DTFT. To visualize this data better, I took the second half of the data, from $N/2:N-1$ and plotted it from $-N/2:-1$. The plot generated from this for each of my input signals is shown below in Fig~\ref{fig:fft}. It represents what I expect.
+
+\begin{figure}[h] \label{fig:fft}
+    \caption{}
+    \centering
+    \includegraphics[width=\textwidth]{}
+\end{figure}
+
+\subsubsection{Modulation}
+
+To modulate a component of the frequency domain into baseband, we first need to identify the appropriate complex exponential to multiply with the original signal. Our signal was sampled at $f_s = 2048000$ Hz or $f_s = 2.048$ MHz. Reworded, our continuous signal has been converted to a discrete signal through sampling; we have done C/D conversion. We know that the output of a C/D converter can be thought of as a time normalization of a continuous time signal, as shown below:
+
+\begin{IEEEeqnarray}{rCl}
+    t \leftrightarrow n\\
+    1 \leftrightarrow T
+\end{IEEEeqnarray}
+
+This also means we have frequency normalization, as shown below.
+
+\begin{IEEEeqnarray}{rCl}
+    2\pi \leftrightarrow \Omega_s\\
+    \omega \leftrightarrow \Omega
+\end{IEEEeqnarray}
+
+We can the identify $\omega_0$ for each signal through the following set of steps.
+
+\begin{enumerate}[label=(\roman*), leftmargin=*, itemsep=0.4ex, before={\everymath{\displaystyle}}]%
+  \item $\dfrac{\Omega_s}{\Omega_0} = \dfrac{2\pi}{\omega_0}$, where we map $\Omega_s$ to $2\pi$
+  \item $\omega_0 = \dfrac{2\pi\Omega_0}{\Omega_s}$, where we solve for $\omega_0$
+\end{enumerate}
+
+Fig~\ref{fig:modulate} shows the process of modulation. It represents what I expect.
+
+\begin{figure}[h] \label{fig:modulate}
+    \caption{}
+    \centering
+    \includegraphics[width=\textwidth]{}
+\end{figure}
+
+\subsubsection{Downsampling}
+
+Following modulation, I implemented a downsampler. To prevent aliasing, I designed an anti-aliasing filter. The pivotal aspect of design here is the choice of the cutoff frequency. We know that discrete-time decimation results in periodic repetitions and frequency scaling in the frequency domain. We want to prevent aliasing, so our cutoff frequency should prevent overlap from these shifted replicas.
+
+First, let's identify some relevant values:
+
+\begin{IEEEeqnarray}{rCl}
+    f_s &=& 2.048 \text{ MHz}\\
+    \Omega_s &=& \dfrac{2\pi}{f_s}\\
+    M &=& 8\\
+\end{IEEEeqnarray}
+
+We set the cutoff frequency, $\omega_c$, to equal $\pi/8$. This should prevent aliasing. I use the function \code{signal.remez} from the \code{scipy.signal} package to build the low pass filter. The input to this program, we use 
+
+
+\end{document}
